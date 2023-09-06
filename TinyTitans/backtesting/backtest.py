@@ -3,34 +3,52 @@ import numpy as np
 import pandas as pd
 from pprint import pprint
 from typing import List, Union
-from TinyTitans.src.backtesting.polygon_api.getting_ticker_data import get_adjusted_close
-from TinyTitans.src.backtesting.distributions import Distribution
-from TinyTitans.src.backtesting.plot_growth import plot_growth
-from TinyTitans.src.backtesting.polygon_api.utils import *
+from TinyTitans.backtesting.polygon_api.getting_ticker_data import get_adjusted_close
+from TinyTitans.backtesting.distributions import Distribution
+from TinyTitans.backtesting.plot_growth import plot_growth
+from TinyTitans.backtesting.polygon_api.utils import *
 import pickle
 from tqdm import tqdm
 from datetime import datetime, timedelta
-from TinyTitans.src.backtesting.process_corporate_actions import CA_Parser
+from TinyTitans.backtesting.missing_data_corrections.process_corporate_actions import CA_Parser
 
 num_stocks_default = 10
 market_min_default = int(25*10**6)
 market_max_default = int(250*10**6)
 ps_ratio_default = 1.0
 
-class BackTester:
+class BackTest:
 
-    def __init__(self, table_b: str, save_adjusted: bool = True) -> None:
+    def __init__(self, polygon_data: str, save_adjusted: bool=True) -> None:
         
         self.ca_parser = CA_Parser()
-        self.table_b = BackTester.read_table_b(table_b)
+        self.polygon_data = self.read_polygon_data(polygon_data)
         self.compute_date_and_ticker_columns()
         self.compute_date_list()
         self.validate_date_list()
-        self.adjust_market_cap_for_multiple_tickers(table_b, save_adjusted)
+        self.adjust_market_cap_for_multiple_tickers(polygon_data, save_adjusted)
         self.compute_PS_ratio_column()
 
-    @staticmethod
-    def read_table_b(fp: str) -> pd.DataFrame:
+    def read_polygon_data(self, fp: str) -> pd.DataFrame:
+        """
+        Summary:
+            Loads polygon data which contains the following columns:
+
+                'cik',
+                'market_cap',
+                'momentum',
+                'shares_outstanding',
+                'adjusted_close',
+                'unadjusted_close',
+                'trailing_12_month_revenue'
+
+            Then sets the index to the tuple key column, which is just the
+            ticker symbol and date in str format: "('ARNA', '2013-06-28')"
+        Args:
+            fp (str): Filepath to the csv containing the polygon data
+        Returns:
+            pd.DataFrame: dataframe ready for processing
+        """
 
         df = pd.read_csv(fp)
         df = df.set_index('tuple_key')
@@ -55,7 +73,7 @@ class BackTester:
         for date in tqdm(date_list):
             cik_mc_map = {}
             df_date = df[df['date'] == date].copy()
-            cik_list = BackTester.get_cik_list(df_date)
+            cik_list = BackTest.get_cik_list(df_date)
             
             
             for tuple_key in df_date.index:
@@ -89,11 +107,11 @@ class BackTester:
                         
         
 
-    def adjust_market_cap_for_multiple_tickers(self, table_b_fp: str, save_adjusted: bool) -> None:
-        self.table_b = BackTester.adjust_market_cap_for_multiple_tickers_static(self.table_b, self.date_list)
+    def adjust_market_cap_for_multiple_tickers(self, polygon_data_fp: str, save_adjusted: bool) -> None:
+        self.polygon_data = BackTest.adjust_market_cap_for_multiple_tickers_static(self.polygon_data, self.date_list)
 
-        if save_adjusted and 'adjusted.csv' not in table_b_fp:
-            self.table_b.to_csv(table_b_fp.replace('.csv', '_adjusted.csv'))
+        if save_adjusted and 'adjusted.csv' not in polygon_data_fp:
+            self.polygon_data.to_csv(polygon_data_fp.replace('.csv', '_adjusted.csv'))
 
     @staticmethod
     def compute_date_and_ticker_columns_static(df: pd.DataFrame) -> pd.DataFrame:
@@ -116,7 +134,7 @@ class BackTester:
         return df
 
     def compute_date_and_ticker_columns(self) -> None:
-        self.table_b = BackTester.compute_date_and_ticker_columns_static(self.table_b)
+        self.polygon_data = BackTest.compute_date_and_ticker_columns_static(self.polygon_data)
 
     @staticmethod
     def compute_PS_ratio_static(df: pd.DataFrame, market_cap='adjusted_market_cap') -> pd.DataFrame:
@@ -125,7 +143,7 @@ class BackTester:
         return df
 
     def compute_PS_ratio_column(self) -> None:
-        self.table_b = BackTester.compute_PS_ratio_static(self.table_b)
+        self.polygon_data = BackTest.compute_PS_ratio_static(self.polygon_data)
 
     @staticmethod
     def compute_date_list_static(df: pd.DataFrame) -> list:
@@ -136,7 +154,7 @@ class BackTester:
 
     def compute_date_list(self, verbose=False) -> None:
 
-        self.date_list = BackTester.compute_date_list_static(self.table_b)
+        self.date_list = BackTest.compute_date_list_static(self.polygon_data)
 
         if verbose:
             print("Date Range:")
@@ -177,14 +195,14 @@ class BackTester:
     def compute_appreciation_column(self, query_df: pd.DataFrame, offset: int, label: str, data_df: pd.DataFrame=None, debug=False) -> pd.DataFrame:
 
         if data_df is None:
-            data_df = self.table_b
+            data_df = self.polygon_data
         
         if debug:
             print(query_df)
 
         appreciation_list = []
 
-        # get rid of annoying pandas warning and make sure we're not modifying table_b
+        # get rid of annoying pandas warning and make sure we're not modifying polygon_data
         query_df = query_df.copy()
         
         for i in query_df.index:
@@ -204,7 +222,7 @@ class BackTester:
 
                 
                 offset_adj_close = data_df.loc[tuple_key, 'adjusted_close']
-                offset_appreciation = BackTester.get_offset_appreciation(offset, adjusted_close, offset_adj_close)
+                offset_appreciation = BackTest.get_offset_appreciation(offset, adjusted_close, offset_adj_close)
 
             except KeyError:
                 
@@ -225,7 +243,7 @@ class BackTester:
 
                         try:
                             offset_adj_close = data_df.loc[tuple_key, 'adjusted_close']
-                            offset_appreciation = BackTester.get_offset_appreciation(offset, adjusted_close, offset_adj_close)
+                            offset_appreciation = BackTest.get_offset_appreciation(offset, adjusted_close, offset_adj_close)
                         except KeyError:
                             print("switched symbol missing")
                             offset_appreciation = np.nan
@@ -317,7 +335,7 @@ class BackTester:
 
         stocks_dict = {}
 
-        if 'momentum' not in list(self.table_b.columns):
+        if 'momentum' not in list(self.polygon_data.columns):
             momentum_approximation = True
         else:
             momentum_approximation = False
@@ -343,9 +361,9 @@ class BackTester:
         for n in range(start_index, len(self.date_list)-1): # can't do anything with last month because we need to compute one month appreciation
 
             date = self.date_list[n]
-            df_date = self.table_b[self.table_b['date'] == date]
+            df_date = self.polygon_data[self.polygon_data['date'] == date]
 
-            df_max = BackTester.all_but_momentum(df_date)
+            df_max = BackTest.all_but_momentum(df_date)
 
             if momentum_approximation:
                 print('\n\napproximating 52 week momentum by using price index from 12 months prior\n\n')
@@ -390,8 +408,8 @@ class BackTester:
                 if missing_approximation is not None:
                     appreciation = missing_approximation
                 else:
-                    nearest_adj_close = BackTester.get_nearest_adjusted_close(ticker, date, offset_date)
-                    appreciation = BackTester.get_offset_appreciation(offset, adjusted_close, nearest_adj_close)
+                    nearest_adj_close = BackTest.get_nearest_adjusted_close(ticker, date, offset_date)
+                    appreciation = BackTest.get_offset_appreciation(offset, adjusted_close, nearest_adj_close)
 
                     if debug:
                         print(ticker)
@@ -535,7 +553,7 @@ class BackTester:
 
         AAII = pd.read_excel(cache_dir + 'OShaughnessyTinyTitansScreen.xls')
 
-        AAII = BackTester.rearrange_date(AAII, 'DATE')
+        AAII = BackTest.rearrange_date(AAII, 'DATE')
 
         AAII = AAII[AAII['date'] >= first_date]
         AAII = AAII[AAII['date'] <= last_date]
@@ -559,7 +577,7 @@ class BackTester:
     def check_and_load_cache(cache_dir: str, ticker: str, dates: list) -> Union[pd.DataFrame, None]:
 
         if ticker == 'AAII':
-            ticker_df = BackTester.load_and_prep_AAII(cache_dir, dates)
+            ticker_df = BackTest.load_and_prep_AAII(cache_dir, dates)
 
         else:
 
@@ -587,7 +605,7 @@ class BackTester:
         ticker_df = {'adjusted_close' : adjusted_closes, 'ticker' : len(dates)*[ticker], 'date' : dates}
         ticker_df = pd.DataFrame.from_dict(ticker_df)
 
-        ticker_df = BackTester.set_tuple_key(ticker_df)
+        ticker_df = BackTest.set_tuple_key(ticker_df)
 
 
         # have to end appreciation computation at last month
@@ -605,7 +623,7 @@ class BackTester:
     def compute_benchmark_returns(self, ticker: str, dates: list) -> list:
         cache_dir = 'benchmark_cache/'
         
-        ticker_df = BackTester.check_and_load_cache(cache_dir, ticker, dates)
+        ticker_df = BackTest.check_and_load_cache(cache_dir, ticker, dates)
 
         if ticker_df is None:
             print(f"Benchmark {ticker} not in cache. Computing now.\n\n")
@@ -669,7 +687,7 @@ class BackTester:
                         ps_ratio : Union[float, List[float]] = ps_ratio_default,
                         save_fp : str = None) -> dict:
 
-        bt = BackTester(fp)
+        bt = BackTest(fp)
 
         stats_dict = {}
         
@@ -729,6 +747,6 @@ if __name__ == '__main__':
     fp = '~/Desktop/table_b_test_long_adjusted_first_month_removed.csv'#
     #fp = '~/Desktop/table_b_test_long_adjusted.csv'
 
-    stats_dict = BackTester.BackTestFactory(fp, None, save_fp = 'non_conservative_missing_tt_test.pickle')#'test_inv_TT_2022-12-03_0_missing_approx.pickle')
+    stats_dict = BackTest.BackTestFactory(fp, None, save_fp = 'non_conservative_missing_tt_test.pickle')#'test_inv_TT_2022-12-03_0_missing_approx.pickle')
 
     #pprint(stats_dict)
