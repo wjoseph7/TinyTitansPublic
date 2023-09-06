@@ -33,9 +33,88 @@ incomplete data. Polygon was used as the main data source https://polygon.io/ .
 The market cap for each ticker had to be adjusted for the case where multiple
 ticker's share the same cik, i.e. are different portions of the same company.
 
-Furthermore, logic for corporate actions 
+Furthermore, logic for corporate actions had to be added using 
+https://stockanalysis.com/ . This way we could properly adjust for changes in
+ticker symbols and bankruptcies. 
+
+The most common issue we encountered was simply recieving nans for various 
+datapoints. This is either because (a) the data simply didn't exist, for 
+example a particular microcap may have had no trades on one day or because (b)
+the data was just missing from polygon.
+
+In the case of missing closing price data our solution was just to check prior
+days within a specified period to see if the stock was traded and use one of 
+the last available close. If there were no datapoints in that period we 
+implemented a scheme so you could set a fill in "depreciation" to approximate.
+
+For other data such as market cap or revenue data, if the needed datapoint 
+could not be obtained the stock was generally eliminated from the investment
+list or "depreciated" as above if we were currently holding. There was an 
+exception with certain revenue data where we could use data from the previous
+year to approximate the trailling twelve month revenue at the current quarter.
+
+# Warning
+
+While I was testing variations of the TT strategy I got curious and decided to 
+examine the returns if I reversed the momentum sorting, i.e. you invested in
+the companies that lost the most money over the previous year. To my surprise,
+returns were significantly better and seemed too good to be true.
+
+//# ToDo insert reverse TT figure below
+
+Upon closer examination, the returns were the result of singular stocks 
+multiplying in price over short time periods. There were an isolated number of 
+these incidents over the 8 year experimental period. I started doing research 
+into these stocks and discovered that this was not actually true price 
+appreciation but reverse stock splits that polygon had not properly adjusted 
+for. Based on my experience, the polygon data is generally adjusted for normal
+stock splits, but it seems for little known micro-cap stocks there are a 
+significant number that had not been adjusted at the time of this experiment.
+
+# Experiment Setup
 
 # Results
 
+# Differences with AAII Portfolio
+
+Overall, we were able to match # TODO insert statistic of the stocks in AAII's 
+portfolio on average each month.
+
+It seems we were able to replicate AAII's TT reasonably well but not perfectly.
+Differences are the result of the following (listed in order of importance):
+
+    (a) Missing data. In certain circumstances the ticker data is just not
+        present in the polygon data but is present in AAII's datasource 
+        (Refinitiv)
+
+    (b) As I only included stocks from the NYSE and NASDAQ I missed a handful 
+        of OTC assets which were included in AAII's portfolio. Note that in 
+        AAII's TT, a stock must be listed on the NYSE or NASDAQ to be invested
+        in. However, they include assets which were listed within the last year
+        whereas I do not for the sake of my momentum calculations.
+
+    (c) In certain cirumstances AAII rounds their data which has an effect on 
+        their portfolio calculations. For example, they would round a 
+        price / sales ratio of 1.001 to 1 and include it in their calculations
+        whereas I would have eliminated it as it's greater than one.
+
+Given that the portfolio is only 25 stocks these differences make a significant
+difference in returns. # TODO insert statistics.
+
+
 # Conclusion
+
+Upon completion of this experiment I decided that I'd rather invest in the S&P
+500 than TT. This is because:
+    (a) The strategy itself is quite volitile
+    (b) It's very sensitive to small differences in the data
+    (c) When you include taxes from rebalancing, the returns drop dramatically
+        when compared with an S&P 500 ETF which would be much more tax 
+        efficient
+
+// insert figure with taxed returns
+
+Also, this experiment made me skeptical of using polygon for long term 
+calculations. I became interested in the concept of developing a news based 
+trading algorithm, so I investigated this next.
 
