@@ -25,7 +25,15 @@ O'Shaughnessy was using. The American Association of Individual Investors
 website has a benchmark using a monthly cycle instead (which does even better).
 So I opted to replicate that.
 
-# Trouble with Missing Data
+# Data Cleaning
+
+The most difficult aspect of this project was dealing with missing or 
+incomplete data. Polygon was used as the main data source https://polygon.io/ .
+
+The market cap for each ticker had to be adjusted for the case where multiple
+ticker's share the same cik, i.e. are different portions of the same company.
+
+Furthermore, logic for corporate actions 
 
 # Results
 
