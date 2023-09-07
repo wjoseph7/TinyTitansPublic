@@ -19,14 +19,17 @@ ps_ratio_default = 1.0
 
 class BackTest:
 
-    def __init__(self, polygon_data: str, save_adjusted: bool=True) -> None:
+    def __init__(self, polygon_data_fp: str, save_adjusted: bool=True) -> None:
         
         self.ca_parser = CA_Parser()
         self.polygon_data = self.read_polygon_data(polygon_data)
         self.compute_date_and_ticker_columns()
         self.compute_date_list()
         self.validate_date_list()
-        self.adjust_market_cap_for_multiple_tickers(polygon_data, save_adjusted)
+        self.adjust_market_cap_for_multiple_tickers(self.polygon_data,
+                                                    self.date_list,
+                                                    polygon_data_fp,
+                                                    save_adjusted)
         self.compute_PS_ratio_column()
 
     def read_polygon_data(self, fp: str) -> pd.DataFrame:
@@ -55,14 +58,24 @@ class BackTest:
 
         return df
 
-    @staticmethod
-    def get_cik_list(df: pd.DataFrame) -> list:
+    def get_cik_list(df: pd.DataFrame) -> List:
+        """
+        Summary:
+            Returns a list of unique ciks contained in the df.
+        Args:
+            df (pd.DataFrame): with cik column we wish to extract
+        Returns:
+            List: of unique ciks
+        """
         cik_list = list(set(list(df['cik'])))
 
         return cik_list
 
-    @staticmethod
-    def adjust_market_cap_for_multiple_tickers_static(df: pd.DataFrame, date_list: list) -> pd.DataFrame:
+    def adjust_market_cap_for_multiple_tickers(self, 
+                                               df: pd.DataFrame,
+                                               date_list: List,
+                                               polygon_data_fp: str,
+                                               save_adjusted: bool) -> pd.DataFrame:
 
         if 'adjusted_market_cap' in list(df.columns):
             return df
@@ -73,7 +86,7 @@ class BackTest:
         for date in tqdm(date_list):
             cik_mc_map = {}
             df_date = df[df['date'] == date].copy()
-            cik_list = BackTest.get_cik_list(df_date)
+            cik_list = self.get_cik_list(df_date)
             
             
             for tuple_key in df_date.index:
@@ -99,16 +112,7 @@ class BackTest:
                     
             adjusted_dfs.append(df_date)
 
-        df = pd.concat(adjusted_dfs)
-
-        return df
-
-                        
-                        
-        
-
-    def adjust_market_cap_for_multiple_tickers(self, polygon_data_fp: str, save_adjusted: bool) -> None:
-        self.polygon_data = BackTest.adjust_market_cap_for_multiple_tickers_static(self.polygon_data, self.date_list)
+        self.polygon_data = pd.concat(adjusted_dfs)
 
         if save_adjusted and 'adjusted.csv' not in polygon_data_fp:
             self.polygon_data.to_csv(polygon_data_fp.replace('.csv', '_adjusted.csv'))
