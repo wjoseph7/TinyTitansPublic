@@ -1,7 +1,8 @@
 import pandas as pd
 import os
 from pprint import pprint
-from typing import Union, Dict
+from typing import Union, Dict, Tuple
+from TinyTitans.util.util import get_CA_dir
 
 month_map = {'Jan' : '01',
              'Feb' : '02',
@@ -67,7 +68,7 @@ class CA_Parser:
         """
         self.ca_dict = self.load_corporate_actions()
 
-    def convert_df_date(self, df: pd.DataFrame) -> pd.DataFrame:
+    def convert_date_df(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Summary:
             Converts date into YYYY-MM-DD format for entire column of dataframe
@@ -101,7 +102,7 @@ class CA_Parser:
             Dict: a dictionary storing the corporate action dfs by year
         """
 
-        ca_dir = dirname = os.path.dirname(__file__) + '/' + 'corporate_actions/'
+        ca_dir = get_CA_dir()
 
         ca_dict = {}
         
@@ -146,7 +147,7 @@ class CA_Parser:
 
 
     def filter_corporate_actions_setup(self, date_one: str, date_two: str) \
-        -> Tuple[str,str]:
+        -> Tuple[str,str,list]:
         """
         Summary:
             This method extracts the first and second year for the query and
@@ -157,7 +158,8 @@ class CA_Parser:
             date_one (str): The lower bound for our query in YYYY-MM-DD format
             date_two (str): The upper bound for our query in YYYY-MM-DD format
         Returns:
-            Tuple[str, str]: first year and second year for query
+            Tuple[str, str, list]: first year and second year for query and 
+                the list of years for which we have corporate actions
         """
         year_one = date_one.split('-')[0]
         year_two = date_two.split('-')[0]
@@ -173,7 +175,7 @@ class CA_Parser:
         assert year_one >= min_year and year_two <= max_year, \
             f"{year_one}, {min_year}, {year_two}, {max_year}"
 
-        return year_one, year_two
+        return year_one, year_two, ca_years
 
     def filter_corporate_actions_inner_loop(self,
                                             year: str,
@@ -207,11 +209,11 @@ class CA_Parser:
             action = ticker_actions.loc[n, 'Action']
 
             if ticker == symbol or ticker in action.split(' '):
-                is_relevant.append(True)
+                self.is_relevant.append(True)
             else:
-                is_relevant.append(False)
+                self.is_relevant.append(False)
 
-        ticker_actions['relevant'] = is_relevant
+        ticker_actions['relevant'] = self.is_relevant
         df = ticker_actions[ticker_actions['relevant']]
 
         return df
@@ -238,15 +240,19 @@ class CA_Parser:
 
         data_dict = {}
 
-        year_one, year_two = self.filter_corporate_actions_setup(date_one, date_two)
+        year_one, year_two, ca_years = \
+            self.filter_corporate_actions_setup(date_one, date_two)
 
         ticker_action_dfs = []
         for year in ca_years:
 
-            is_relevant = []
+            self.is_relevant = []
             if year >= year_one and year <= year_two:
 
-                df = self.filter_corporate_actions_inner_loop(year, ticker, date_one, date_two)
+                df = self.filter_corporate_actions_inner_loop(year,
+                                                              ticker,
+                                                              date_one,
+                                                              date_two)
 
                 ticker_action_dfs.append(df)
 
@@ -306,44 +312,3 @@ class CA_Parser:
 
         else:
             return None
-
-        
-
-            
-
-if __name__ == '__main__':
-    
-    ca_parser = CA_Parser()
-
-    #pprint(ca_parser.ca_dict)
-
-    ticker = 'IKNX'
-
-    date_one = '2021-11-01'
-    date_two = '2021-12-16'
-    action = ca_parser.process_symbol_changes_and_bankruptcies(ticker, date_one, date_two)
-    assert action == 'symbol_change:IKNX->WULF'
-
-    date_one = '2021-12-14'
-    date_two = '2021-12-14'
-    action = ca_parser.process_symbol_changes_and_bankruptcies(ticker, date_one, date_two)
-    assert action == 'symbol_change:IKNX->WULF'
-
-    date_one = '2012-11-01'
-    date_two = '2021-12-16'
-    action = ca_parser.process_symbol_changes_and_bankruptcies(ticker, date_one, date_two)
-    assert action == 'symbol_change:IKNX->WULF'
-
-    date_one = '2012-11-01'
-    date_two = '2020-12-16'
-    action = ca_parser.process_symbol_changes_and_bankruptcies(ticker, date_one, date_two)
-    assert action is None
-
-    ticker = 'HLCSQ'
-    date_one = '2012-12-27'
-    date_two = '2013-12-28'
-
-    action = ca_parser.process_symbol_changes_and_bankruptcies(ticker, date_one, date_two)
-    assert action == 'bankruptcy'
-
-    print('Tests passed!!')
