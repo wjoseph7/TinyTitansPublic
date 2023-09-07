@@ -1,2 +1,5 @@
 *.egg-info
 *.csv
+*~
+*.pyc
+__pycache__
