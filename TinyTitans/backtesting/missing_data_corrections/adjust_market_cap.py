@@ -1,5 +1,7 @@
 import pandas as pd
 from typing import List
+from tqdm import tqdm
+import numpy as np
 
 class MarketCapAdjuster:
     """
@@ -134,7 +136,7 @@ class MarketCapAdjuster:
         for date in tqdm(date_list):
             self.cik_mc_map = {}
             self.df_date = df[df['date'] == date].copy()
-            self.cik_list = self.get_cik_list(df_date)
+            self.cik_list = self.get_cik_list(self.df_date)
             
             self.adjust_market_cap_inner_loops()
                     
