@@ -11,6 +11,7 @@ import pickle
 from tqdm import tqdm
 from datetime import datetime, timedelta
 from TinyTitans.backtesting.missing_data_corrections.process_corporate_actions import CA_Parser
+from TinyTitans.backtesting.missing_data_corrections.adjust_market_cap import MarketCapAdjuster
 
 num_stocks_default = 10
 market_min_default = int(25*10**6)
@@ -26,10 +27,14 @@ class BackTest:
         self.compute_date_and_ticker_columns()
         self.compute_date_list()
         self.validate_date_list()
-        self.adjust_market_cap_for_multiple_tickers(self.polygon_data,
-                                                    self.date_list,
-                                                    polygon_data_fp,
-                                                    save_adjusted)
+
+        self.polygon_data = \
+            MarketCapAdjuster.adjust_market_cap_for_multiple_tickers_static(
+                self.polygon_data,
+                self.date_list,
+                polygon_data_fp,
+                save_adjusted)
+
         self.compute_PS_ratio_column()
 
     def read_polygon_data(self, fp: str) -> pd.DataFrame:
@@ -57,65 +62,6 @@ class BackTest:
         df = df.set_index('tuple_key')
 
         return df
-
-    def get_cik_list(df: pd.DataFrame) -> List:
-        """
-        Summary:
-            Returns a list of unique ciks contained in the df.
-        Args:
-            df (pd.DataFrame): with cik column we wish to extract
-        Returns:
-            List: of unique ciks
-        """
-        cik_list = list(set(list(df['cik'])))
-
-        return cik_list
-
-    def adjust_market_cap_for_multiple_tickers(self, 
-                                               df: pd.DataFrame,
-                                               date_list: List,
-                                               polygon_data_fp: str,
-                                               save_adjusted: bool) -> pd.DataFrame:
-
-        if 'adjusted_market_cap' in list(df.columns):
-            return df
-
-        adjusted_dfs = []
-
-        print("adjusting market cap for ciks that have multiple tickers")
-        for date in tqdm(date_list):
-            cik_mc_map = {}
-            df_date = df[df['date'] == date].copy()
-            cik_list = self.get_cik_list(df_date)
-            
-            
-            for tuple_key in df_date.index:
-                cik = df_date.loc[tuple_key, 'cik']
-                market_cap = df_date.loc[tuple_key, 'market_cap']
-                if not np.isnan(cik):
-                    if cik in cik_mc_map.keys():
-                        cik_mc_map[cik]['tuple_key'].append(tuple_key)
-                        cik_mc_map[cik]['market_cap'] += market_cap
-                    else:
-                        cik_mc_map[cik] = {}
-                        cik_mc_map[cik]['tuple_key'] = [tuple_key]
-                        cik_mc_map[cik]['market_cap'] = market_cap
-
-            df_date.loc[:, 'adjusted_market_cap'] = df_date.loc[:, 'market_cap']
-
-            for tuple_key in df_date.index:
-                for cik in cik_mc_map.keys():
-                    tuple_keys = cik_mc_map[cik]['tuple_key']
-                    adjusted_market_cap = cik_mc_map[cik]['market_cap']
-                    if tuple_key in tuple_keys:
-                        df_date.loc[tuple_key, 'adjusted_market_cap'] = adjusted_market_cap
-                    
-            adjusted_dfs.append(df_date)
-
-        self.polygon_data = pd.concat(adjusted_dfs)
-
-        if save_adjusted and 'adjusted.csv' not in polygon_data_fp:
-            self.polygon_data.to_csv(polygon_data_fp.replace('.csv', '_adjusted.csv'))
 
     @staticmethod
     def compute_date_and_ticker_columns_static(df: pd.DataFrame) -> pd.DataFrame:
