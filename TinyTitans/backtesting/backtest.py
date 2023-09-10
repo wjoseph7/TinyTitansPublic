@@ -684,64 +684,56 @@ class BackTest:
 
     @staticmethod
     def BackTestFactory(fp: str,
-                        missing_approximation_penalty: float = 1.0,
-                        num_stocks : Union[int, List[int]] = num_stocks_default,
-                        market_cap_min: Union[int, List[int]] = market_min_default,
-                        market_cap_max : Union[int, List[int]] = market_max_default,
-                        ps_ratio : Union[float, List[float]] = ps_ratio_default,
-                        save_fp : str = None) -> dict:
-
-        bt = BackTest(fp)
-
-        stats_dict = {}
+                        missing_approximation_penalty: float=1.0,
+                        num_stocks: int=num_stocks_default,
+                        market_cap_min: int=market_min_default,
+                        market_cap_max: int=market_max_default,
+                        ps_ratio: float= ps_ratio_default,
+                        save_fp: Union[str,None]=None) -> Dict:
+        """
+        Summary:
+            Factory method for run_backtest
+        Args:
+            fp (str): fp to polygon data
+            missing_approximation_penalty (float): if we encounter nans, how to
+                fill in appreciation.
+            num_stocks (int): number of stocks we hold each month in backtest.
+            market_cap_min (int): minimum market cap of stocks we consider
+            market_cap_max (int): maximum market cap of stocks we consider
+            ps_ratio (float): price to sales ratio our stocks must be less than
+            save_fp (Union[str,None]): filepath to save our data to
+        Returns:
+            Dict: dictionary with query and result statistics and data
+        """
         
-        if isinstance(num_stocks, int):
-            assert isinstance(market_cap_min, int)
-            assert isinstance(market_cap_max, int)
-            assert isinstance(ps_ratio, float)
+        assert isinstance(missing_approximation_penalty, float)
+        assert isinstance(num_stocks, int)
+        assert isinstance(market_cap_min, int)
+        assert isinstance(market_cap_max, int)
+        assert isinstance(ps_ratio, float)
 
-            stats_dict['query_0'] = {'num_stocks' : num_stocks,
-                                     'market_cap_min' : market_cap_min,
-                                     'market_cap_max' : market_cap_max,
-                                     'ps_ratio' : ps_ratio,
-                                     'missing_penalty' : missing_approximation_penalty}
+        back_test = BackTest(fp)
+        stats_dict = {}
 
-            stats_dict['results_0']  = bt.run_backtest(missing_approximation_penalty,
-                                                       num_stocks,
-                                                       market_cap_min,
-                                                       market_cap_max,
-                                                       ps_ratio)
+        stats_dict['query'] = {
+            'num_stocks' : num_stocks,
+            'market_cap_min' : market_cap_min,
+            'market_cap_max' : market_cap_max,
+            'ps_ratio' : ps_ratio,
+            'missing_penalty' : missing_approximation_penalty}
 
-        elif isinstance(num_stocks, list):
-            assert len(num_stocks) == len(market_cap_min)
-            assert len(num_stocks) == len(makert_cap_max)
-            assert len(num_stocks) == len(ps_ratio)
-
-            for n in range(len(num_stocks)):
-
-                ns = num_stocks[n]
-                mc_min = market_cap_min[n] 
-                mc_max = market_cap_max[n]
-                ps = ps_ratio[n]
-
-                stats_dict[f'query_{n}'] = {'num_stocks' : ns,
-                                            'market_cap_min' : mc_min,
-                                            'market_cap_max' : mc_max,
-                                            'ps_ratio' : ps,
-                                            'missing_penalty' : missing_approximation_penalty}
-                
-                stats_dict[f'results_{n}']  = bt.run_backtest(missing_approximation_penalty,
-                                                              ns,
-                                                              mc_min,
-                                                              mc_max,
-                                                              ps)
+        stats_dict['results'] = back_test.run_backtest(
+            missing_approximation_penalty,
+            num_stocks,
+            market_cap_min,
+            market_cap_max,
+            ps_ratio)
 
         if save_fp is not None:
             with open('results/' + save_fp, 'wb') as f:
                 pickle.dump(stats_dict, f)
                 f.close()
 
-        
         return stats_dict
 
             
