@@ -21,12 +21,33 @@ ps_ratio_default = 1.0
 class BackTest:
 
     def __init__(self, polygon_data_fp: str, save_adjusted: bool=True) -> None:
+        """
+        Summary:
+            This is the constructor for the BackTest class. We do the 
+            following:
+
+                - Instantiate the corporate action parser for later use in 
+                    handle_symbol_change_and_bankruptcy
+                - Load the polygon data into a df
+                - Add date and ticker columns to the df
+                - Compute and store a list of ordered sequential dates
+                - Validate the list is indeed sequential
+                - Adjust market cap for companies with multiple tickers
+                - Add a column to estimate the price to sales ratio
+
+        Args:
+            polygon_date_fp (str): filepath to the polygon data
+            save_adjusted (bool): whether we want to save the polygon data 
+                after market cap adjustment for quicker backtesting later.
+        """
         
         self.ca_parser = CA_Parser()
         self.polygon_data = self.read_polygon_data(polygon_data)
-        self.compute_date_and_ticker_columns()
-        self.compute_date_list()
-        self.validate_date_list()
+        self.polygon_data = self.compute_date_and_ticker_columns(
+            self.polygon_data)
+
+        self.date_list = self.compute_date_list(self.polygon_data)
+        self.validate_date_list(self.date_list)
 
         self.polygon_data = \
             MarketCapAdjuster.adjust_market_cap_for_multiple_tickers_static(
@@ -35,7 +56,7 @@ class BackTest:
                 polygon_data_fp,
                 save_adjusted)
 
-        self.compute_PS_ratio_column()
+        self.polygon_data = self.compute_PS_ratio_column(self.polygon_data)
 
     def read_polygon_data(self, fp: str) -> pd.DataFrame:
         """
@@ -63,12 +84,20 @@ class BackTest:
 
         return df
 
-    @staticmethod
-    def compute_date_and_ticker_columns_static(df: pd.DataFrame) -> pd.DataFrame:
+    def compute_date_and_ticker_columns(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Summary:
+            Adds date and ticker columns to the df by extracting the info from
+            the tuple key index
+        Args:
+            df (pd.DataFrame): The df we want to add the date and ticker 
+            columns to
+        Returns:
+            pd.DataFrame: Same df but with date and ticker columns
+        """
 
         ticker_list = []
         date_list = []
-
         
         for tuple_key in df.index:
 
@@ -83,42 +112,67 @@ class BackTest:
 
         return df
 
-    def compute_date_and_ticker_columns(self) -> None:
-        self.polygon_data = BackTest.compute_date_and_ticker_columns_static(self.polygon_data)
-
-    @staticmethod
-    def compute_PS_ratio_static(df: pd.DataFrame, market_cap='adjusted_market_cap') -> pd.DataFrame:
-        df['PS_ratio'] = df[market_cap] / df['trailing_twelve_month_revenue']
+    def compute_PS_ratio_column(self, 
+                                df: pd.DataFrame,
+                                market_cap_col: str='adjusted_market_cap') \
+                                    -> pd.DataFrame:
+        """
+        Summary:
+            This creates a new column of the dataframe intended to act as an
+            estimate for the price to sales ratio. We just take the market cap
+            and divide it by the trailing twelve month revenue.
+        Args:
+            df (pd.DataFrame):
+            market_cap_col (str): The column name to use for market cap
+        Returns:
+            pd.DataFrame: with new PS_ratio column
+        """
+        df['PS_ratio'] = df[market_cap_col] / df['trailing_twelve_month_revenue']
 
         return df
 
-    def compute_PS_ratio_column(self) -> None:
-        self.polygon_data = BackTest.compute_PS_ratio_static(self.polygon_data)
+    def compute_date_list(self, df: pd.DataFrame, verbose=False) -> List:
+        """
+        Summary:
+            Creates an ordered list of unique dates extracted from the df
+        Args:
+            df (pd.DataFrame): df with date column whose dates we wish to 
+                               extract
+            verbose (bool): whether to print date range (useful for debugging)
+        Returns:
+            List: sorted list of unique dates in df
+        """
 
-    @staticmethod
-    def compute_date_list_static(df: pd.DataFrame) -> list:
         date_list = list(set(list(df['date'])))
         date_list = sorted(date_list)
 
-        return date_list
-
-    def compute_date_list(self, verbose=False) -> None:
-
-        self.date_list = BackTest.compute_date_list_static(self.polygon_data)
-
         if verbose:
             print("Date Range:")
-            pprint(self.date_list)
+            pprint(date_list)
             print('\n\n')
 
-    def validate_date_list(self) -> None:
+        return date_list
 
-        min_time = min(self.date_list)
-        max_time = max(self.date_list)
+    def validate_date_list(self, date_list: List) -> None:
+        """
+        Summary:
+            Validates that year and month of dates and date list are in 
+            sequential order. Day not used.
 
-        for n in range(len(self.date_list)-1):
-            date1 = self.date_list[n]
-            date2 = self.date_list[n+1]
+            Assertion thrown if this is not the case. Otherwise None is 
+            returned.
+        Args:
+            date_list (List): The date list we wish to validate
+        Returns:
+            None
+        """
+
+        min_time = min(date_list)
+        max_time = max(date_list)
+
+        for n in range(len(date_list)-1):
+            date1 = date_list[n]
+            date2 = date_list[n+1]
 
             y1, m1, _ = date1.split('-')
             y2, m2, _ = date2.split('-')
@@ -139,8 +193,8 @@ class BackTest:
                 print(date1)
                 print(date2)
 
-
-        print(f"Date range validated. Data spans from {min_time} until {max_time}.")
+        print(f"Date range validated. Data spans from {min_time} until " +\
+            f"{max_time}.")
 
     def compute_appreciation_column(self, query_df: pd.DataFrame, offset: int, label: str, data_df: pd.DataFrame=None, debug=False) -> pd.DataFrame:
 
