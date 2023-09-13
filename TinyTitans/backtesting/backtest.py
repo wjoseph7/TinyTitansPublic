@@ -329,16 +329,22 @@ class BackTest:
 
         return df_max
 
+    def determine_momentum_type(self, debug: bool) -> int:
+        """
+        Summary:
+            If there's already a momentum column in the dataframe that means
+            when it was scraped the date 52 weeks prior was also scraped so 
+            that momentum could be exactly computed. In this case that value
+            is just used.
 
-    def find_TT(self,
-                num_stocks: int = num_stocks_default,
-                market_cap_min: int = market_min_default,
-                market_cap_max: int = market_max_default,
-                ps_ratio: float = ps_ratio_default,
-                debug: bool = True) -> dict:
-
-        stocks_dict = {}
-
+            If there is no momentum column the date 12 months ago is used as a
+            proxy. 
+        Args: 
+            debug (bool): set to True to print momentum approximation
+        Returns:
+            int: The start index which is 0 if we're using the momentum 
+                approximation and 0 otherwise
+        """
         if 'momentum' not in list(self.polygon_data.columns):
             momentum_approximation = True
         else:
@@ -348,42 +354,87 @@ class BackTest:
             print(f"Using momentum approximation: {momentum_approximation}")
 
         if momentum_approximation:
-
             start_index = 12
-        
-            assert len(self.date_list) > start_index # need to look one year behind with close data
-
+            # need to look one year behind with close data
+            assert len(self.date_list) > start_index 
         else:
             start_index = 0
+
+        return start_index
+
+    def compute_monthly_TT_df(self, 
+                              n: int,
+                              momentum_approximation: bool,
+                              num_stocks: int) -> pd.DataFrame:
+        """
+        Summary:
+            Computes the pandas df for a particular month of tiny titans
+        Args:
+            n (int): The index of the date list we're currently computing
+            momentum_approximation (bool): whether we're approximating momentum
+                using monthly data rather than 52 weeks exactly
+            num_stocks (int): number of stocks we hold each month in backtest.
+        Returns:
+            pd.DataFrame: the df for that month of TT
+        """
+                            
+        date = self.date_list[n]
+        df_date = self.polygon_data[self.polygon_data['date'] == date]
+
+        df_max = BackTest.all_but_momentum(df_date)
+
+        if momentum_approximation:
+            print('\n\napproximating 52 week momentum by using price index '\
+                  +'from 12 months prior\n\n')
+            df = self.compute_appreciation_column(df_max, -12, 'momentum')
+        else:
+            df = df_max
+            
+        df = df.sort_values('momentum', ascending=True)#False)
+
+        return df[:num_stocks].copy()
+
+    def find_TT(self,
+                num_stocks: int=num_stocks_default,
+                market_cap_min: int=market_min_default,
+                market_cap_max: int=market_max_default,
+                ps_ratio: float=ps_ratio_default,
+                debug: bool=True) -> Dict:
+        """
+        Summary:
+            Computes the TT stocks for each month in our time frame.
+
+            Stores the results in a which is then returned
+
+        Args:
+            num_stocks (int): number of stocks we hold each month in backtest.
+            market_cap_min (int): minimum market cap of stocks we consider
+            market_cap_max (int): maximum market cap of stocks we consider
+            ps_ratio (float): price to sales ratio our stocks must be less than
+            debug (bool): set to True to print momentum approximation
+        Returns:
+            Dict: of with values as dfs containing stats on TT stocks and keys
+                are dates about one month apart
+        """
+        stocks_dict = {}
+
+        start_index = self.determine_momentum_type(debug)
 
         beginning = self.date_list[start_index]
         n_months = len(self.date_list) - start_index
         end = self.date_list[-1]
         
-        print(f"Benchmarking TT performance for {n_months} months from {beginning} until {end}.\n\n")
+        print(f"Benchmarking TT performance for {n_months} months from " \
+              + f"{beginning} until {end}.\n\n")
 
-        for n in range(start_index, len(self.date_list)-1): # can't do anything with last month because we need to compute one month appreciation
-
-            date = self.date_list[n]
-            df_date = self.polygon_data[self.polygon_data['date'] == date]
-
-            df_max = BackTest.all_but_momentum(df_date)
-
-            if momentum_approximation:
-                print('\n\napproximating 52 week momentum by using price index from 12 months prior\n\n')
-                df = self.compute_appreciation_column(df_max, -12, 'momentum')
-            else:
-                df = df_max
-
-            #print(df['momentum'])
-            #print(df)
-                
-            df = df.sort_values('momentum', ascending=True)#False)
-            #print(df)
-            #input()
-
-            stocks_dict[date] = df[:num_stocks].copy()
-
+        # can't do anything with last month because we need to compute one 
+        # month appreciation
+        for n in range(start_index, len(self.date_list)-1):
+           stocks_dict[date] = self.compute_monthly_TT_df(
+                n, 
+                momentum_approximation,
+                num_stocks
+            )
 
         return stocks_dict
 
@@ -475,7 +526,7 @@ class BackTest:
                                df : pd.DataFrame,
                                num_stocks : int,
                                missing_appreciation_approximation : float,
-                               appreciation_type : str) -> Dict:
+                               appreciation_type : str) -> Tuple[Dict,float]:
         """
         Summary:
             This method executes the appreciation operations for run_backtest.
@@ -494,7 +545,10 @@ class BackTest:
                 how to fill in appreciation.
             appreciation_type (str): appreciation column to use
         Returns:
-            Dict: dictionary with query and result statistics and data
+            Tuple[Dict,float]: 
+                Dict - keys are monthly dates, values are df of TT portfolio 
+                    on that day
+                float - is investment appreciation for this month
         """
             
         df = stocks_dict[date]
