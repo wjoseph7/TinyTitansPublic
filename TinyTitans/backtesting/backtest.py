@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from pprint import pprint
-from typing import List, Union
+from typing import List, Union, Dict
 from TinyTitans.backtesting.polygon_api.getting_ticker_data import get_adjusted_close
 from TinyTitans.backtesting.distributions import Distribution
 from TinyTitans.backtesting.plot_growth import plot_growth
@@ -469,16 +469,91 @@ class BackTest:
 
         raise ValueError
 
+    def appreciation_operation(self, 
+                               date : str,
+                               stocks_dict : Dict,
+                               df : pd.DataFrame,
+                               num_stocks : int,
+                               missing_appreciation_approximation : float,
+                               appreciation_type : str) -> Dict:
+        """
+        Summary:
+            This method executes the appreciation operations for run_backtest.
+
+            First we compute the appreciation column.
+            Then we correct for nans.
+            Next we compute the portfolio appreciation.
+            Finally we save the data in a dictionary.
+            
+        Args:
+            date (str): particular date we wish to compute the appreciation for
+            stocks_dict (Dict): dictionary containing dfs on TT stocks for each
+                month
+            num_stocks (int): number of stocks we hold each month in backtest.
+            missing_approximation_approximation (float): if we encounter nans,
+                how to fill in appreciation.
+            appreciation_type (str): appreciation column to use
+        Returns:
+            Dict: dictionary with query and result statistics and data
+        """
+            
+        df = stocks_dict[date]
+
+        df = self.compute_appreciation_column(df, 
+                                              1,
+                                              'one_month_appreciation')
+        
+        df = df.reset_index()
+        df, nans_encountered = self.correct_nans(
+            df,
+            1,
+            'one_month_appreciation',
+            num_stocks,
+            missing_appreciation_approximation
+        )
+
+        appreciation = sum(
+            df.loc[:num_stocks, appreciation_type]) \
+            / \
+            min(num_stocks, len(df.index)
+        )
+        investment *= appreciation
+
+        self.stats_dict[date] = {'monthly_roi' : appreciation - 1.0,
+                                 'data' : df,
+                                 'nans' : nans_encountered}
+
+        return stats_dict, investment
+
     def run_backtest(self,
-                     missing_appreciation_approximation: float = None,
-                     num_stocks: int = num_stocks_default,
-                     market_cap_min: int = market_min_default,
-                     market_cap_max: int = market_max_default,
-                     ps_ratio: float = ps_ratio_default,
-                     appreciation_type: str = 'one_month_appreciation_adjusted') -> dict:
+                     missing_appreciation_approximation: Union[float,None]=None,
+                     num_stocks: int=num_stocks_default,
+                     market_cap_min: int=market_min_default,
+                     market_cap_max: int=market_max_default,
+                     ps_ratio: float=ps_ratio_default,
+                     appreciation_type: str='one_month_appreciation_adjusted'
+                     ) -> Dict:
+        """
+        Summary:
+            First we create the stocks_dict which contains a df of the TT stock
+            for each month, the date of the snapshot corresponding the the key.
 
-
-        stats_dict = {}
+            Then we loop through all dates and compute the appreciation of TT
+            over time. The results are saved in the stats dict which is then 
+            used in analyze backtest to produce plots and statistics.
+            
+        Args:
+            missing_approximation_penalty (float): if we encounter nans, how to
+                fill in appreciation.
+            num_stocks (int): number of stocks we hold each month in backtest.
+            market_cap_min (int): minimum market cap of stocks we consider
+            market_cap_max (int): maximum market cap of stocks we consider
+            ps_ratio (float): price to sales ratio our stocks must be less than
+            appreciation_type (str): appreciation column to use
+        Returns:
+            Dict: dictionary with query and result statistics and data
+        """
+        self.stats_dict = {}
 
         stocks_dict = self.find_TT(num_stocks,
                                    market_cap_min,
@@ -486,31 +561,27 @@ class BackTest:
                                    ps_ratio)
 
         if missing_appreciation_approximation is not None:
-            print("If one month appreciation is missing we approximate by assuming stock is sold for" \
-                  + f" {missing_appreciation_approximation*100}% of its initial value.\n\n")
+            print("If one month appreciation is missing we approximate by" \
+                  + "assuming stock is sold for " \
+                  + f"{missing_appreciation_approximation*100}% of its initial" \
+                  + "value.\n\n")
         else:
-            print("If one month appreciation is missing we use stock's last close.\n\n")
+            print("If one month appreciation is missing we use stock's last "\
+                  + "close.\n\n")
 
         investment = 1.0
         for date in self.date_list:
-            appreciation = 0
-            nans_encountered = 0
             
             if date in stocks_dict.keys():
-                df = stocks_dict[date]
-
-                df = self.compute_appreciation_column(df, 1, 'one_month_appreciation')
-                
-                df = df.reset_index()
-                df, nans_encountered = self.correct_nans(df, 1, 'one_month_appreciation', num_stocks, missing_appreciation_approximation)
-
-                appreciation = sum(df.loc[:num_stocks, appreciation_type]) / min(num_stocks, len(df.index))
-                investment *= appreciation
-
-                stats_dict[date] = {'monthly_roi' : appreciation - 1.0, 'data' : df, 'nans' : nans_encountered}
+                self.stats_dict, investment = self.appreciation_operation(
+                    date,
+                    stocks_dict,
+                    num_stocks,
+                    missing_appreciation_approximation,
+                    appreciation_type
+                )
 
         stats_dict['growth_of_dollar'] = investment
-
         self.analyze_backtest(stats_dict)
 
         return stats_dict
