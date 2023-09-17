@@ -2,7 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 from pprint import pprint
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Tuple
 from TinyTitans.backtesting.polygon_api.getting_ticker_data import get_adjusted_close
 from TinyTitans.backtesting.distributions import Distribution
 from TinyTitans.backtesting.plot_growth import plot_growth
@@ -338,33 +338,11 @@ class BackTest:
         
         for i in query_df.index:
 
-            adjusted_close = query_df.loc[i, 'adjusted_close']
-
-            ticker = query_df.loc[i, 'ticker']
-            date = query_df.loc[i, 'date']
-
-
-            date_index = self.date_list.index(date)
-            offset_date = self.date_list[date_index+offset]
-
-            tuple_key = str((ticker, offset_date))
-
-            try:
-                offset_adj_close = data_df.loc[tuple_key, 'adjusted_close']
-                offset_appreciation = self.get_offset_appreciation(
-                    offset,
-                    adjusted_close,
-                    offset_adj_close
-                )
-
-            except KeyError:
-                offset_appreciation = handle_appreciation_column_key_error(
-                    ticker,
-                    date,
-                    offset_date,
-                    label,
-                    data_df
-                )
+            offset_appreciation = self.execute_compute_appreciation_column_row(
+                i,
+                offset,
+                query_df
+            )
 
             appreciation_list.append(offset_appreciation)
 
@@ -372,10 +350,27 @@ class BackTest:
 
         return query_df
 
-    def handle_symbol_and_bankruptcy(self, ticker: str, date: str, offset_date: str) -> tuple:
-        # adjust for corporate actions
-        # symbol changes and bankruptcies
+    def handle_symbol_and_bankruptcy(self, 
+                                     ticker: str,
+                                     date: str,
+                                     offset_date: str) -> Tuple[Tuple, str]:
+        """
+        Summary:
+            Uses the CA_Parser to determine if there was a bankruptcy or symbol
+            change between two given dates. 
 
+            Returns the corporate action str and tuple key adjusted for 
+            possible symbol changes.
+        Args:
+            ticker (str): the ticker we're interested in
+            date (str): the initial date
+            offset_date (str): the second date
+        Returns:
+            Tuple[Tuple, str]: 
+                - Tuple: The tuple key with the new ticker if there was a 
+                    symbol change
+                - str: The corporate action str
+        """
         backwards = False
 
         if date < offset_date:
@@ -440,16 +435,38 @@ class BackTest:
 
         return offset_appreciation
 
-    @staticmethod
-    def all_but_momentum(df : pd.DataFrame,
-                         market_cap_min: int = market_min_default,
-                         market_cap_max: int = market_max_default,
-                         ps_ratio: float = ps_ratio_default,
-                         market_cap_type: str = 'adjusted_market_cap') -> pd.DataFrame:
-        
+    def all_but_momentum(self,
+                         df: pd.DataFrame,
+                         market_cap_min: int=market_min_default,
+                         market_cap_max: int=market_max_default,
+                         ps_ratio: float=ps_ratio_default,
+                         market_cap_type: str='adjusted_market_cap'
+                         ) -> pd.DataFrame:
+        """
+        Summary:
+            Given a dataframe of ticker data over time, we compute a subset 
+            based on 'all values but momentum' . So we eliminate all entries
+            which violate our prices to sales ratio and market cap rules, for
+            the tiny titans strategy. 
+            
+            Note that this function is very simple whereas the momentum computations
+            get comparatively complex due to missing data.
+
+        Args:
+            df (pd.DataFrame): The df we wish to find a subset of.
+            market_cap_min (int): The minimum market cap we consider
+            market_cap_max (int): The maximum market cap we consider
+            ps_ratio (float): The highest price to sales ratio we allow
+            market_cap_type (str): The column name of the market cap type to
+                use. We default to the market cap adjusted for multiple tickers
+                with the same company.
+        Returns:
+            pd.DataFrame: with rows which violate the ps ratio and market cap
+                thresholds removed.
+        """
+
         df_ps = df[df['PS_ratio'] <= ps_ratio]
         df_ps = df_ps[df_ps['PS_ratio'] >= 0.0]
-        #df_ps = df
 
         df_min = df_ps[df_ps[market_cap_type] >= market_cap_min]
 
@@ -509,7 +526,7 @@ class BackTest:
         date = self.date_list[n]
         df_date = self.polygon_data[self.polygon_data['date'] == date]
 
-        df_max = BackTest.all_but_momentum(df_date)
+        df_max = self.all_but_momentum(df_date)
 
         if momentum_approximation:
             print('\n\napproximating 52 week momentum by using price index '\
