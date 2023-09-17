@@ -196,7 +196,133 @@ class BackTest:
         print(f"Date range validated. Data spans from {min_time} until " +\
             f"{max_time}.")
 
-    def compute_appreciation_column(self, query_df: pd.DataFrame, offset: int, label: str, data_df: pd.DataFrame=None, debug=False) -> pd.DataFrame:
+    def handle_appreciation_column_key_error(self,
+                                             ticker: str,
+                                             date: str,
+                                             offset_date: str,
+                                             label: str,
+                                             data_df: pd.DataFrame) -> float:
+        """
+        Summary:
+            This method handles the case where we get a KeyError in the 
+            loop appreciation column method. Since there's a KeyError that 
+            means the appreciation data point doesn't exist. We check for 
+            bankruptcy or ticker symbol changes and adjust accordingly. 
+            If no such corporate actions are found we return nan.
+        Args:
+            ticker (str): ticker we want aprpeciation of
+            date (str): initial date we're querying
+            offset_date (str): offset date
+            label (str): label for new appreciation column
+            data_df (pd.DataFrame): df we're pulling the data from
+        Returns:
+            float: the offset appreciation in the case of a KeyError
+        """
+        tuple_key, action = self.handle_symbol_and_bankruptcy(
+            ticker,
+            date,
+            offset_date
+        )
+        if label != 'momentum':
+            print("#####")
+            print(tuple_key)
+            print(action)
+
+        if action is None:
+            offset_appreciation = np.nan
+        else:
+            print(f"{ticker} {date} {offset_date} {action} {label}")
+
+            if offset > 0 and action == 'bankruptcy':
+                offset_appreciation = 0.0
+            else:
+
+                try:
+                    offset_adj_close = data_df.loc[
+                        tuple_key,
+                        'adjusted_close'
+                    ]
+                    offset_appreciation = self.get_offset_appreciation(
+                        offset,
+                        adjusted_close,
+                        offset_adj_close
+                    )
+                except KeyError:
+                    print("switched symbol missing")
+                    offset_appreciation = np.nan
+        
+        return offset_appreciation
+
+    def execute_compute_appreciation_column_row(self,
+                                                i: int,
+                                                offset: int,
+                                                query_df: pd.DataFrame
+                                                ) -> float:
+        """
+        Summary:
+            Executes one loop for the compute_appreciation_column method.
+
+            i corresponds to the row of the query_df we wish to use.
+        Args:
+            i (int): index of the query_df we wish to use
+            offset (int): number of months between dates
+            query_df (pd.DataFrame): df we're using to pull data from
+        Returns:
+            float: offset appreciation
+        """
+
+
+        adjusted_close = query_df.loc[i, 'adjusted_close']
+
+        ticker = query_df.loc[i, 'ticker']
+        date = query_df.loc[i, 'date']
+        
+        date_index = self.date_list.index(date)
+        offset_date = self.date_list[date_index+offset]
+
+        tuple_key = str((ticker, offset_date))
+
+        try:
+            offset_adj_close = data_df.loc[tuple_key, 'adjusted_close']
+            offset_appreciation = self.get_offset_appreciation(
+                offset,
+                adjusted_close,
+                offset_adj_close
+            )
+
+        except KeyError:
+            offset_appreciation = self.handle_appreciation_column_key_error(
+                ticker,
+                date,
+                offset_date,
+                label,
+                data_df
+            )
+        
+        return offset_appreciation
+
+
+    def compute_appreciation_column(self,
+                                    query_df: pd.DataFrame,
+                                    offset: int,
+                                    label: str,
+                                    data_df: pd.DataFrame=None,
+                                    debug=False) -> pd.DataFrame:
+        """
+        Summary:
+            Computes appreciation of stocks in query_df using data in data_df.
+        Args:
+            query_df (pd.DataFrame): ususally a smaller snapshot of the data_df
+                that we use for the query
+            offset (int): the offset for appreciation we want to compute 
+                (monthly 1, or annually for momentum over the past year -12)
+            label (str): the label we want to save the appreciation under
+            data_df (pd.DataFrame): the (usually) larger df we are pulling the 
+                appreciation data from
+            debug (bool): prints messages useful for debugging
+        Returns:
+            pd.DataFrame: query_df with the new appreciation column
+        """
 
         if data_df is None:
             data_df = self.polygon_data
@@ -206,7 +332,8 @@ class BackTest:
 
         appreciation_list = []
 
-        # get rid of annoying pandas warning and make sure we're not modifying polygon_data
+        # get rid of annoying pandas warning and make sure we're not modifying
+        # polygon_data
         query_df = query_df.copy()
         
         for i in query_df.index:
@@ -223,35 +350,21 @@ class BackTest:
             tuple_key = str((ticker, offset_date))
 
             try:
-
-                
                 offset_adj_close = data_df.loc[tuple_key, 'adjusted_close']
-                offset_appreciation = BackTest.get_offset_appreciation(offset, adjusted_close, offset_adj_close)
+                offset_appreciation = self.get_offset_appreciation(
+                    offset,
+                    adjusted_close,
+                    offset_adj_close
+                )
 
             except KeyError:
-                
-                tuple_key, action = self.handle_symbol_and_bankruptcy(ticker, date, offset_date)
-                if label != 'momentum':
-                    print("#####")
-                    print(tuple_key)
-                    print(action)
-
-                if action is None:
-                    offset_appreciation = np.nan
-                else:
-                    print(f"{ticker} {date} {offset_date} {action} {label}")
-
-                    if offset > 0 and action == 'bankruptcy':
-                        offset_appreciation = 0.0
-                    else:
-
-                        try:
-                            offset_adj_close = data_df.loc[tuple_key, 'adjusted_close']
-                            offset_appreciation = BackTest.get_offset_appreciation(offset, adjusted_close, offset_adj_close)
-                        except KeyError:
-                            print("switched symbol missing")
-                            offset_appreciation = np.nan
-                        
+                offset_appreciation = handle_appreciation_column_key_error(
+                    ticker,
+                    date,
+                    offset_date,
+                    label,
+                    data_df
+                )
 
             appreciation_list.append(offset_appreciation)
 
@@ -289,12 +402,27 @@ class BackTest:
 
         return tuple_key, action
 
-        
-
-    @staticmethod
-    def get_offset_appreciation(offset: int, adjusted_close: float, offset_adj_close: float, eps: float=1e-3) -> float:
+    def get_offset_appreciation(self,
+                                offset: int,
+                                adjusted_close: float,
+                                offset_adj_close: float,
+                                eps: float=1e-3) -> float:
+        """
+        Summary:
+            This function computes the appreciation between two values with
+            a given monthly offset. Handles nan and dividing by near zero 
+            quantities as well.
+        Args:
+            offset (int): the number of months between adjusted_close and 
+                offset_adj_close. Negative means we're offset_adj_close has an
+                earlier date
+            adjusted_close (float): adjusted close of current month
+            offset_adj_close (float): adjusted close at offset
+            eps (float): Used to ensure we don't divide by near zero values
+        Returns:
+            float: The appreciation
+        """
         if offset < 0:
-
             if abs(offset_adj_close) > eps:
                 offset_appreciation = adjusted_close / offset_adj_close
             else:
@@ -464,7 +592,7 @@ class BackTest:
                     appreciation = missing_approximation
                 else:
                     nearest_adj_close = BackTest.get_nearest_adjusted_close(ticker, date, offset_date)
-                    appreciation = BackTest.get_offset_appreciation(offset, adjusted_close, nearest_adj_close)
+                    appreciation = self.get_offset_appreciation(offset, adjusted_close, nearest_adj_close)
 
                     if debug:
                         print(ticker)
