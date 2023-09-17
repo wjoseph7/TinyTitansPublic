@@ -12,7 +12,7 @@ class MarketCapAdjuster:
     """
 
     def __init__(self, 
-                 df : pd.DataFrame,
+                 df: pd.DataFrame,
                  date_list: List,
                  polygon_data_fp: str,
                  save_adjusted: bool):

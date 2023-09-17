@@ -11,6 +11,7 @@ import pickle
 from tqdm import tqdm
 from datetime import datetime, timedelta
 from TinyTitans.backtesting.missing_data_corrections.process_corporate_actions import CA_Parser
+from TinyTitans.backtesting.missing_data_corrections.correct_nans import NanCorrector
 from TinyTitans.backtesting.missing_data_corrections.adjust_market_cap import MarketCapAdjuster
 
 num_stocks_default = 10
@@ -42,6 +43,7 @@ class BackTest:
         """
         
         self.ca_parser = CA_Parser()
+        self.nan_corrector = NanCorrector()
         self.polygon_data = self.read_polygon_data(polygon_data)
         self.polygon_data = self.compute_date_and_ticker_columns(
             self.polygon_data)
@@ -242,7 +244,7 @@ class BackTest:
                         tuple_key,
                         'adjusted_close'
                     ]
-                    offset_appreciation = self.get_offset_appreciation(
+                    offset_appreciation = BackTest.get_offset_appreciation(
                         offset,
                         adjusted_close,
                         offset_adj_close
@@ -284,7 +286,7 @@ class BackTest:
 
         try:
             offset_adj_close = data_df.loc[tuple_key, 'adjusted_close']
-            offset_appreciation = self.get_offset_appreciation(
+            offset_appreciation = BackTest.get_offset_appreciation(
                 offset,
                 adjusted_close,
                 offset_adj_close
@@ -397,6 +399,7 @@ class BackTest:
 
         return tuple_key, action
 
+    @staticmethod
     def get_offset_appreciation(self,
                                 offset: int,
                                 adjusted_close: float,
@@ -407,6 +410,10 @@ class BackTest:
             This function computes the appreciation between two values with
             a given monthly offset. Handles nan and dividing by near zero 
             quantities as well.
+
+            Made a staticmethod since it's used by Nan_Corrector and I don't 
+            want them both pointing to active instances of each other with 
+            changing data.
         Args:
             offset (int): the number of months between adjusted_close and 
                 offset_adj_close. Negative means we're offset_adj_close has an
@@ -583,88 +590,6 @@ class BackTest:
 
         return stocks_dict
 
-    def correct_nans(self, df: pd.DataFrame, offset: int, column_name: str, num_stocks: int, missing_approximation: float = None, debug: bool = False) -> (pd.DataFrame, int):
-        
-        nans_encountered = 0
-
-        df[column_name + '_adjusted'] = df[column_name]
-
-        df_length = len(df.index)
-
-        print(f"only {df_length} / {num_stocks} stocks found")
-        
-        for n in range(min(num_stocks, df_length)):
-
-            appreciation = df.loc[n, column_name]
-            ticker = df.loc[n, 'ticker']
-            adjusted_close = df.loc[n, 'adjusted_close']
-            date = df.loc[n, 'date']
-            date_index = self.date_list.index(date)
-            offset_date = self.date_list[date_index+offset]
-
-            if np.isnan(appreciation):
-                nans_encountered += 1
-                
-                if missing_approximation is not None:
-                    appreciation = missing_approximation
-                else:
-                    nearest_adj_close = BackTest.get_nearest_adjusted_close(ticker, date, offset_date)
-                    appreciation = self.get_offset_appreciation(offset, adjusted_close, nearest_adj_close)
-
-                    if debug:
-                        print(ticker)
-                        print(appreciation)
-                    
-                df.loc[n, column_name + '_adjusted'] = appreciation
-
-        return df, nans_encountered
-
-    @staticmethod
-    def get_nearest_adjusted_close(ticker: str, begin_date: str, missing_date: str, cache = True) -> float:
-
-        assert missing_date > begin_date
-
-        
-        str_begin_date = begin_date
-        cache_fp = f'nan_cache/{begin_date}_{ticker}.pkl'
-
-        # load nearest closes from cache if they exist
-        if os.path.exists(cache_fp):
-            nan_dict = pickle.load(open(cache_fp, 'rb'))
-            last_adjusted_close = nan_dict['last_adjusted_close']
-            return last_adjusted_close
-
-
-        date = missing_date
-        date = datetime.strptime(date,  '%Y-%m-%d') # convert to datetime
-
-        begin_date = datetime.strptime(begin_date,  '%Y-%m-%d') #convert to datetime
-
-        while date >= begin_date:
-
-            date -= timedelta(days=1)
-
-            if is_trading_day(date):
-                str_date = date.strftime('%Y-%m-%d')
-                adjusted_close = get_adjusted_close(ticker, str_date)
-                if not np.isnan(adjusted_close):
-
-                    if cache:
-                        nan_dict = {'ticker' : ticker,
-                                    'purchase_date' : str_begin_date,
-                                    'missing_date' : missing_date,
-                                    'last_close_date' : str_date,
-                                    'last_adjusted_close' : adjusted_close}
-
-                        
-                        with open(cache_fp, 'wb') as f:
-                            pickle.dump(nan_dict, f)
-                            f.close()
-                    
-                    return adjusted_close
-
-        raise ValueError
-
     def appreciation_operation(self, 
                                date : str,
                                stocks_dict : Dict,
@@ -703,7 +628,8 @@ class BackTest:
                                               'one_month_appreciation')
         
         df = df.reset_index()
-        df, nans_encountered = self.correct_nans(
+        df, nans_encountered = self.nan_corrector.correct_nans(
+            self.date_list,
             df,
             1,
             'one_month_appreciation',
