@@ -13,6 +13,7 @@ from datetime import datetime, timedelta
 from TinyTitans.backtesting.missing_data_corrections.process_corporate_actions import CA_Parser
 from TinyTitans.backtesting.missing_data_corrections.correct_nans import NanCorrector
 from TinyTitans.backtesting.missing_data_corrections.adjust_market_cap import MarketCapAdjuster
+from TinyTitans.backtesting.analyze_backtest import BackTestAnalyzer
 
 num_stocks_default = 10
 market_min_default = int(25*10**6)
@@ -44,6 +45,7 @@ class BackTest:
         
         self.ca_parser = CA_Parser()
         self.nan_corrector = NanCorrector()
+        self.backtest_analyzer = BackTestAnalyzer()
         self.polygon_data = self.read_polygon_data(polygon_data)
         self.polygon_data = self.compute_date_and_ticker_columns(
             self.polygon_data)
@@ -272,8 +274,6 @@ class BackTest:
         Returns:
             float: offset appreciation
         """
-
-
         adjusted_close = query_df.loc[i, 'adjusted_close']
 
         ticker = query_df.loc[i, 'ticker']
@@ -707,176 +707,9 @@ class BackTest:
                 )
 
         stats_dict['growth_of_dollar'] = investment
-        self.analyze_backtest(stats_dict)
+        self.backtest_analyzer.analyze_backtest(stats_dict)
 
         return stats_dict
-
-    @staticmethod
-    def set_tuple_key(df: pd.DataFrame) -> pd.DataFrame:
-
-        tuple_keys = []
-        for i in df.index:
-            ticker = df.loc[i, 'ticker']
-            date = df.loc[i, 'date']
-            tk = str((ticker, date))
-            tuple_keys.append(tk)
-
-        df['tuple_key'] = tuple_keys
-        
-        df = df.set_index('tuple_key')
-
-        return df
-
-
-    @staticmethod
-    def rearrange_date(df: pd.DataFrame, date_col: str) -> pd.DataFrame:
-        new_dates = []
-
-        for i in df.index:
-            date = df.loc[i, date_col]
-            month, day, year = date.split('-')
-            new_date = '-'.join([year, month, day])
-
-            new_dates.append(new_date)
-
-        df['date'] = new_dates
-
-        return df
-            
-    
-    @staticmethod
-    def load_and_prep_AAII(cache_dir: str, dates: list) -> Union[pd.DataFrame, None]:
-
-        first_date = dates[0]
-        last_date = dates[-1]
-
-
-        AAII = pd.read_excel(cache_dir + 'OShaughnessyTinyTitansScreen.xls')
-
-        AAII = BackTest.rearrange_date(AAII, 'DATE')
-
-        AAII = AAII[AAII['date'] >= first_date]
-        AAII = AAII[AAII['date'] <= last_date]
-
-        AAII['one_month_appreciation'] = 1 + AAII['MONTHLY PERFORMANCE']/100
-
-        for i in AAII.index:
-            date = AAII.loc[i, 'date']
-            if date == last_date:
-                break
-            AAII.loc[i, 'one_month_appreciation'] = AAII.loc[i+1, 'one_month_appreciation']
-
-        AAII = AAII[:-1]
-
-            
-        return AAII
-        
-        
-
-    @staticmethod
-    def check_and_load_cache(cache_dir: str, ticker: str, dates: list) -> Union[pd.DataFrame, None]:
-
-        if ticker == 'AAII':
-            ticker_df = BackTest.load_and_prep_AAII(cache_dir, dates)
-
-        else:
-
-            cached = os.listdir(cache_dir)
-
-            first_date = dates[0]
-            last_date = dates[-1]
-
-            ticker_df = None
-
-            for cache in cached:
-                if ticker in cache and first_date in cache and last_date in cache:
-                    ticker_df = pd.read_csv(cache_dir + cache)
-                    break
-
-        return ticker_df
-
-    def create_and_save_benchmark_returns(self, cache_dir: str, ticker: str, dates: list) -> pd.DataFrame:
-        adjusted_closes = []
-
-        for date in dates:
-            close = get_adjusted_close(ticker, date)
-            adjusted_closes.append(close)
-
-        ticker_df = {'adjusted_close' : adjusted_closes, 'ticker' : len(dates)*[ticker], 'date' : dates}
-        ticker_df = pd.DataFrame.from_dict(ticker_df)
-
-        ticker_df = BackTest.set_tuple_key(ticker_df)
-
-
-        # have to end appreciation computation at last month
-        ticker_df = self.compute_appreciation_column(ticker_df[:-1], 1, 'one_month_appreciation', data_df=ticker_df)
-
-        first_date = dates[0]
-        last_date = dates[-1]
-
-        ticker_df.to_csv(cache_dir + ticker + '_' + first_date + '_' + last_date + '.csv')
-
-        return ticker_df
-
-        
-
-    def compute_benchmark_returns(self, ticker: str, dates: list) -> list:
-        cache_dir = 'benchmark_cache/'
-        
-        ticker_df = BackTest.check_and_load_cache(cache_dir, ticker, dates)
-
-        if ticker_df is None:
-            print(f"Benchmark {ticker} not in cache. Computing now.\n\n")
-            ticker_df = self.create_and_save_benchmark_returns(cache_dir, ticker, dates)
-
-        monthly_roi = []
-        for i in ticker_df.index:
-            roi = (ticker_df.loc[i, 'one_month_appreciation'] - 1.0)*100
-            monthly_roi.append(roi)
-
-        return monthly_roi
-
-
-    def analyze_backtest(self, stats_dict: dict, benchmarks: List = ['VOO', 'VTWO', 'AAII']) -> dict:
-
-        final_date = self.date_list[-1]
-        
-        analysis_dict = {'date' : [], 'TT_monthly_roi%' : [], 'nans' : []}
-
-        target_dates = set(stats_dict.keys())
-        target_dates = sorted(list(target_dates.intersection(set(self.date_list))))
-
-        for date in self.date_list:
-            if date in target_dates:
-                analysis_dict['date'].append(date)
-                analysis_dict['TT_monthly_roi%'].append(stats_dict[date]['monthly_roi']*100)
-                analysis_dict['nans'].append(stats_dict[date]['nans'])
-
-        target_dates.append(final_date) # need to add back on last one to compute appreciation
-        for benchmark in benchmarks:
-            analysis_dict[benchmark + '_monthly_roi%'] = self.compute_benchmark_returns(benchmark, target_dates)
-
-        df = pd.DataFrame.from_dict(analysis_dict)
-
-        plot_growth(df)
-
-        print(df)
-
-        average_nans = np.mean(df['nans'])
-        print(f'\n\nAverage nans per month = {average_nans}')
-
-        print(f"\n\nTT $1 becomes : {stats_dict['growth_of_dollar']} on {final_date}")
-
-        for benchmark in benchmarks:
-            one_dollar = 1.0
-            for i in df.index:
-                monthly_roi = df.loc[i, benchmark + '_monthly_roi%']
-                monthly_roi = 1 + monthly_roi / 100
-                one_dollar *= monthly_roi
-
-            print(f"{benchmark} $1 becomes : {one_dollar}")
-
-        stats = Distribution.DistributionFactory(analysis_dict)
 
     @staticmethod
     def BackTestFactory(fp: str,
@@ -931,9 +764,6 @@ class BackTest:
                 f.close()
 
         return stats_dict
-
-            
-
 
 if __name__ == '__main__':
     fp = '~/Desktop/table_b_test_long_adjusted_first_month_removed.csv'#
