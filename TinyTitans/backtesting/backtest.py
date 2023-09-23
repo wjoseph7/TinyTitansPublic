@@ -3,9 +3,6 @@ import numpy as np
 import pandas as pd
 from pprint import pprint
 from typing import List, Union, Dict, Tuple
-from TinyTitans.backtesting.polygon_api.getting_ticker_data import get_adjusted_close
-from TinyTitans.backtesting.distributions import Distribution
-from TinyTitans.backtesting.plot_growth import plot_growth
 from TinyTitans.backtesting.polygon_api.utils import *
 import pickle
 from tqdm import tqdm
@@ -45,7 +42,7 @@ class BackTest:
         
         self.ca_parser = CA_Parser()
         self.nan_corrector = NanCorrector()
-        self.backtest_analyzer = BackTestAnalyzer()
+        self.backtest_analyzer = BackTestAnalyzer(self)
         self.polygon_data = self.read_polygon_data(polygon_data)
         self.polygon_data = self.compute_date_and_ticker_columns(
             self.polygon_data)
@@ -591,12 +588,12 @@ class BackTest:
         return stocks_dict
 
     def appreciation_operation(self, 
-                               date : str,
-                               stocks_dict : Dict,
-                               df : pd.DataFrame,
-                               num_stocks : int,
-                               missing_appreciation_approximation : float,
-                               appreciation_type : str) -> Tuple[Dict,float]:
+                               date: str,
+                               stocks_dict: Dict,
+                               df: pd.DataFrame,
+                               num_stocks: int,
+                               missing_appreciation_approximation: float,
+                               appreciation_type: str) -> Tuple[Dict,float]:
         """
         Summary:
             This method executes the appreciation operations for run_backtest.
@@ -707,7 +704,7 @@ class BackTest:
                 )
 
         stats_dict['growth_of_dollar'] = investment
-        self.backtest_analyzer.analyze_backtest(stats_dict)
+        stats_dict = self.backtest_analyzer.analyze_backtest(stats_dict)
 
         return stats_dict
 
