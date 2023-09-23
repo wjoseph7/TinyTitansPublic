@@ -3,10 +3,8 @@ import numpy as np
 import pandas as pd
 from pprint import pprint
 from typing import List, Union, Dict, Tuple
-from TinyTitans.backtesting.polygon_api.utils import *
 import pickle
 from tqdm import tqdm
-from datetime import datetime, timedelta
 from TinyTitans.backtesting.missing_data_corrections.process_corporate_actions import CA_Parser
 from TinyTitans.backtesting.missing_data_corrections.correct_nans import NanCorrector
 from TinyTitans.backtesting.missing_data_corrections.adjust_market_cap import MarketCapAdjuster
@@ -648,6 +646,7 @@ class BackTest:
         return stats_dict, investment
 
     def run_backtest(self,
+                     plot_label: str,
                      missing_appreciation_approximation: Union[float,None]=None,
                      num_stocks: int=num_stocks_default,
                      market_cap_min: int=market_min_default,
@@ -665,6 +664,7 @@ class BackTest:
             used in analyze backtest to produce plots and statistics.
             
         Args:
+            plot_label (str): label to save plot with
             missing_approximation_penalty (float): if we encounter nans, how to
                 fill in appreciation.
             num_stocks (int): number of stocks we hold each month in backtest.
@@ -704,12 +704,14 @@ class BackTest:
                 )
 
         stats_dict['growth_of_dollar'] = investment
-        stats_dict = self.backtest_analyzer.analyze_backtest(stats_dict)
+        stats_dict = self.backtest_analyzer.analyze_backtest(plot_label,
+                                                             stats_dict)
 
         return stats_dict
 
     @staticmethod
     def BackTestFactory(fp: str,
+                        plot_label: str,
                         missing_approximation_penalty: float=1.0,
                         num_stocks: int=num_stocks_default,
                         market_cap_min: int=market_min_default,
@@ -721,6 +723,7 @@ class BackTest:
             Factory method for run_backtest
         Args:
             fp (str): fp to polygon data
+            plot_label (str): label to save plot with
             missing_approximation_penalty (float): if we encounter nans, how to
                 fill in appreciation.
             num_stocks (int): number of stocks we hold each month in backtest.
@@ -749,6 +752,7 @@ class BackTest:
             'missing_penalty' : missing_approximation_penalty}
 
         stats_dict['results'] = back_test.run_backtest(
+            plot_label,
             missing_approximation_penalty,
             num_stocks,
             market_cap_min,

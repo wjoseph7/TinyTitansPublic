@@ -2,7 +2,7 @@ from typing import Tuple
 from TinyTitans.backtesting.backtest import BackTest
 from datetime import datetime
 import pickle
-from TinyTitans.backtesting.polygon_api.getting_ticker_data import get_adjusted_close
+from TinyTitans.backtesting.polygon_api.ticker_api_calls import get_adjusted_close
 
 
 class NanCorrector:

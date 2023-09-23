@@ -1,6 +1,6 @@
 from typing import List, Dict
 from TinyTitans.backtesting.backtest import BackTest
-from TinyTitans.backtesting.polygon_api.getting_ticker_data import get_adjusted_close
+from TinyTitans.backtesting.polygon_api.ticker_api_calls import get_adjusted_close
 from TinyTitans.backtesting.distributions import Distribution
 from TinyTitans.backtesting.plot_growth import plot_growth
 
@@ -241,6 +241,7 @@ class BackTestAnalyzer:
 
 
     def analyze_backtest(self,
+                         plot_label: str,
                          stats_dict: Dict, 
                          benchmarks: List=['VOO','VTWO','AAII']) -> Dict:
         """
@@ -249,6 +250,7 @@ class BackTestAnalyzer:
             and distribution of returns. Plots returns over time and computes
             ditribution statistics.
         Args:
+            plot_label (str): label to save plot with
             stats_dict (Dict): dictionary with date keys and values are ticker
                 data, monthly roi, and nan count
             benchmarks (List): List of benchmark tickers (or AAII) to compare
@@ -267,7 +269,7 @@ class BackTestAnalyzer:
                                    stats_dict,
                                    benchmarks)
 
-        plot_growth(df)
+        plot_growth(plot_label, df)
 
         print(df)
 
