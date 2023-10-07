@@ -73,6 +73,15 @@ significant number that had not been adjusted at the time of this experiment.
 
 # Experiment Setup
 
+Several experiments were executed computing appreciation using the last trading
+day of every month. The growth of funds for our custom TT implementation as 
+well as AAII's and the S&P500 and Russell 2000 benchmarks were computed from
+2013-06-28 until 2022-04-29. This spans 107 months or almost a 9 year period.
+
+Different results run using different missing approximations primarily. 
+Decreasing the number of stocks increased volatility without increasing 
+appreciation reliably. Playing with parameters such as the price-to-sales ratio
+and market cap min and max did not improve performance significantly. 
 
 # Results
 
@@ -80,6 +89,19 @@ Below is a replication of Tiny Titans where if a nan is encountered for monthly
 appreciation we use the last available price over two weeks to approximate. If 
 we cannot find this price 0 is used. As you can see even with this generous 
 generous approximation results are significantly below AAII's implementation.
+
+Although, it is important to note we see the same characteristic behavior and
+shape, such as the significant draw down at month 80. Likewise we are able to
+outperform the S&P 500 and Russell 2000 benchmarks with respect to the end long
+term appreciation. However, one should also note that we only outperform the 
+S&P 500 slightly at the end and underperform for significant periods of time.
+
+For this experiment 58 nans (missing price appreciation for a particular stock)
+were encountered in total so about one out of every two months had a price we 
+couldn't compute the exact appreciation of.
+
+So it is unclear if the performance of TT would continue to be superior to the 
+S&P if we were able to extend the test for a few decades.
 
 Note that VOO and VTWO are vanguard operated ETFs which approximate the S&P 500
 and the Russell 2000 repectively. 
@@ -119,9 +141,6 @@ significant outlier losses due to our missing approximations.
 
 # Differences with AAII Portfolio
 
-Overall, we were able to match # TODO insert statistic of the stocks in AAII's 
-portfolio on average each month.
-
 It seems we were able to replicate AAII's TT reasonably well but not perfectly.
 Differences are the result of the following (listed in order of importance):
 
@@ -141,22 +160,20 @@ Differences are the result of the following (listed in order of importance):
         whereas I would have eliminated it as it's greater than one.
 
 Given that the portfolio is only 25 stocks these differences make a significant
-difference in returns. # TODO insert statistics.
+difference in returns. 
 
 
 # Conclusion
 
 Upon completion of this experiment I decided that I'd rather invest in the S&P
 500 than TT. This is because:
-    (a) The strategy itself is quite volitile
+    (a) The strategy itself is quite volatile
     (b) It's very sensitive to small differences in the data
     (c) When you include taxes from rebalancing, the returns drop dramatically
         when compared with an S&P 500 ETF which would be much more tax 
-        efficient
-
-// insert figure with taxed returns
+        efficient and experiences much less volatility.
 
 Also, this experiment made me skeptical of using polygon for long term 
 calculations. I became interested in the concept of developing a news based 
-trading algorithm, so I investigated this next.
+day trading algorithm, so I investigated this next.
 
