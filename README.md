@@ -60,7 +60,7 @@ examine the returns if I reversed the momentum sorting, i.e. you invested in
 the companies that lost the most money over the previous year. To my surprise,
 returns were significantly better and seemed too good to be true.
 
-//# ToDo insert reverse TT figure below
+![plot](./TinyTitans/results/REVERSE_TT_100_stocks_ps_ratio_1_historical_returns_over_time.png)
 
 Upon closer examination, the returns were the result of singular stocks 
 multiplying in price over short time periods. There were an isolated number of 
@@ -73,7 +73,49 @@ significant number that had not been adjusted at the time of this experiment.
 
 # Experiment Setup
 
+
 # Results
+
+Below is a replication of Tiny Titans where if a nan is encountered for monthly
+appreciation we use the last available price over two weeks to approximate. If 
+we cannot find this price 0 is used. As you can see even with this generous 
+generous approximation results are significantly below AAII's implementation.
+
+Note that VOO and VTWO are vanguard operated ETFs which approximate the S&P 500
+and the Russell 2000 repectively. 
+
+![plot](./TinyTitans/results/25_stocks_classic_TT_1_ps_ratio_last_missing_approx_historical_returns_over_time_2022-12-03.png)
+
+When we just mark all the nans as zero results drop significantly and you're 
+better off just holding your money.
+
+![plot](./TinyTitans/results/25_stocks_classic_TT_1_ps_ratio_0_missing_approx_historical_returns_over_time_2022-12-03.png)
+
+If we take the mean and standard deviation of the returns for each month for
+for all strategies and plot the fitted normal distributions we get the plot 
+below. 
+
+![plot](./TinyTitans/results/TT_monthly_roi%_vs_VOO_monthly_roi%_vs_VTWO_monthly_roi%_vs_AAII_monthly_roi%.png)
+
+Note that the AAII and our custom TT distributions match up pretty closely with
+this normal fitting. Both distributions are wider than VOO and VTWO's but have 
+a larger mean. 
+
+If we look at the actual histogram plots, however, we see some troublesome 
+behavior.
+
+![plot](./TinyTitans/results/AAII_monthly_roi%.png)
+![plot](./TinyTitans/results/VOO_monthly_roi%.png)
+![plot](./TinyTitans/results/VTWO_monthly_roi%.png)
+
+As you can see, the above distributions are bell shaped. They do exhibit an 
+expected skew but look pretty expected.
+
+![plot](./TinyTitans/results/TT_monthly_roi%.png)
+
+However, the replicated Tiny Titans distribution is much stranger looking with
+significant outlier losses due to our missing approximations.
+
 
 # Differences with AAII Portfolio
 
