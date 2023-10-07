@@ -105,7 +105,7 @@ If we look at the actual histogram plots, however, we see some troublesome
 behavior.
 
 ![plot](./TinyTitans/results/AAII_monthly_roi%.png)
-![plot](./TinyTitans/results/VOO_monthly_roi%.png)
+![plot](./TinyTitans/results/VOO_monthly_roi.png)
 ![plot](./TinyTitans/results/VTWO_monthly_roi%.png)
 
 As you can see, the above distributions are bell shaped. They do exhibit an 
