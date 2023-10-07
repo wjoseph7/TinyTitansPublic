@@ -95,7 +95,7 @@ If we take the mean and standard deviation of the returns for each month for
 for all strategies and plot the fitted normal distributions we get the plot 
 below. 
 
-![plot](./TinyTitans/results/TT_monthly_roi_vs_VOO_monthly_roi_vs_VTWO_monthly_roi_vs_AAII_monthly_roi%.png)
+![plot](./TinyTitans/results/TT_monthly_roi_vs_VOO_monthly_roi_vs_VTWO_monthly_roi_vs_AAII_monthly_roi.png)
 
 Note that the AAII and our custom TT distributions match up pretty closely with
 this normal fitting. Both distributions are wider than VOO and VTWO's but have 
