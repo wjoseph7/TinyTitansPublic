@@ -8,7 +8,7 @@ O'Shaughnessy.
 In O'Shaughnessy's book the strategy with the largest long term returns was a
 micro-cap strategy called Tiny Titans (TT). I wanted to see if I could recreate 
 these results myself and compare the robustness of TT to other benchmarks,
-especially to see how it compares when you factor taxes in. 
+especially to see how it compares when we factored our tax rates in. 
 
 # The Tiny Titans Strategy
 
