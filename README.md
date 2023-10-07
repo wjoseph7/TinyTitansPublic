@@ -95,7 +95,7 @@ If we take the mean and standard deviation of the returns for each month for
 for all strategies and plot the fitted normal distributions we get the plot 
 below. 
 
-![plot](./TinyTitans/results/TT_monthly_roi%_vs_VOO_monthly_roi%_vs_VTWO_monthly_roi%_vs_AAII_monthly_roi%.png)
+![plot](./TinyTitans/results/TT_monthly_roi_vs_VOO_monthly_roi_vs_VTWO_monthly_roi_vs_AAII_monthly_roi%.png)
 
 Note that the AAII and our custom TT distributions match up pretty closely with
 this normal fitting. Both distributions are wider than VOO and VTWO's but have 
@@ -104,14 +104,14 @@ a larger mean.
 If we look at the actual histogram plots, however, we see some troublesome 
 behavior.
 
-![plot](./TinyTitans/results/AAII_monthly_roi%.png)
+![plot](./TinyTitans/results/AAII_monthly_roi.png)
 ![plot](./TinyTitans/results/VOO_monthly_roi.png)
-![plot](./TinyTitans/results/VTWO_monthly_roi%.png)
+![plot](./TinyTitans/results/VTWO_monthly_roi.png)
 
 As you can see, the above distributions are bell shaped. They do exhibit an 
 expected skew but look pretty expected.
 
-![plot](./TinyTitans/results/TT_monthly_roi%.png)
+![plot](./TinyTitans/results/TT_monthly_roi.png)
 
 However, the replicated Tiny Titans distribution is much stranger looking with
 significant outlier losses due to our missing approximations.
