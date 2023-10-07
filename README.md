@@ -42,10 +42,10 @@ datapoints. This is either because (a) the data simply didn't exist, for
 example a particular microcap may have had no trades on one day or because (b)
 the data was just missing from polygon.
 
-In the case of missing closing price data our solution was just to check prior
-days within a specified period to see if the stock was traded and use one of 
-the last available close. If there were no datapoints in that period we 
-implemented a scheme so you could set a fill in "depreciation" to approximate.
+In the case of missing closing price data, our solution was just to check prior
+days within a specified period to see if the stock was traded and use the last
+available close. If there were no datapoints in that period we implemented a 
+scheme so you could set a fill in "depreciation" to approximate.
 
 For other data such as market cap or revenue data, if the needed datapoint 
 could not be obtained the stock was generally eliminated from the investment
@@ -64,7 +64,7 @@ returns were significantly better and seemed too good to be true.
 
 Upon closer examination, the returns were the result of singular stocks 
 multiplying in price over short time periods. There were an isolated number of 
-these incidents over the 8 year experimental period. I started doing research 
+these incidents over the ~9 year experimental period. I started doing research 
 into these stocks and discovered that this was not actually true price 
 appreciation but reverse stock splits that polygon had not properly adjusted 
 for. Based on my experience, the polygon data is generally adjusted for normal
@@ -78,17 +78,17 @@ day of every month. The growth of funds for our custom TT implementation as
 well as AAII's and the S&P500 and Russell 2000 benchmarks were computed from
 2013-06-28 until 2022-04-29. This spans 107 months or almost a 9 year period.
 
-Different results run using different missing approximations primarily. 
-Decreasing the number of stocks increased volatility without increasing 
-appreciation reliably. Playing with parameters such as the price-to-sales ratio
-and market cap min and max did not improve performance significantly. 
+The missing approximation employed to approximate price appreciation had the 
+largest influence. Decreasing the number of stocks increased volatility without 
+increasing appreciation reliably. Playing with parameters such as the price-to-sales
+ratio and market cap min and max did not improve performance significantly. 
 
 # Results
 
 Below is a replication of Tiny Titans where if a nan is encountered for monthly
-appreciation we use the last available price over two weeks to approximate. If 
-we cannot find this price 0 is used. As you can see even with this generous 
-generous approximation results are significantly below AAII's implementation.
+appreciation we use the last available price over two weeks to approximate. As 
+you can see even with this generous generous approximation results are 
+significantly below AAII's implementation.
 
 Although, it is important to note we see the same characteristic behavior and
 shape, such as the significant draw down at month 80. Likewise we are able to
@@ -133,7 +133,7 @@ Differences are the result of the following (listed in order of importance):
         present in the polygon data but is present in AAII's datasource 
         (Refinitiv)
 
-    (b) As I only included stocks from the NYSE and NASDAQ I missed a handful 
+    (b) As I only included stocks from the NYSE and NASDAQ, I missed a handful 
         of OTC assets which were included in AAII's portfolio. Note that in 
         AAII's TT, a stock must be listed on the NYSE or NASDAQ to be invested
         in. However, they include assets which were listed within the last year
